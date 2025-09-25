@@ -1,0 +1,19 @@
+{
+    "accounts": [
+        {
+            "username": "adamroche",
+            "password": "rochea21#",
+            "spool": "mail"
+        },
+        {
+            "username": "nickjohnson",
+            "password": "johnsonn25#",
+            "spool": "mail"
+        },
+        {
+            "username": "joeywilliams",
+            "password": "williamsj44#",
+            "spool": "mail"
+        }
+    ]
+}
