@@ -7,7 +7,7 @@ public class MailQueue {
 
     private LinkedBlockingQueue<File> mailQueue; //mail queue
 
-    private File mailMessage;
+    private File mailMessage; //mail message {will assign later}
     
     //constructor creating a linked blocking queue
     public MailQueue() {
@@ -20,8 +20,24 @@ public class MailQueue {
         return mailQueue;
     }
 
-    public void addEmail() throws InterruptedException {
-        //add mail message to queue
-        mailQueue.put(mailMessage);
+    //add new email message to front of queue
+    public void addEmail(File newMailMessage) throws InterruptedException {
+
+        mailQueue.add(mailMessage); //add message to end of queue for now
+        
+        LinkedBlockingQueue<File> tempMailQueue = new LinkedBlockingQueue<>(); //temporary mail queue to hold all current 
+                                                                               //contents
+                                                                               
+        mailQueue.drainTo(tempMailQueue); //take out all contents of the temporary mail queue
+
+        mailQueue.put(newMailMessage); //put the new mail message at the tail for now (while all other contents are removed)
+        
+        //add the rest of the message back into the queue
+        for(File mailMessage : tempMailQueue) {
+            mailQueue.put(mailMessage);
+        }
+
+        //takes the email message from the front of the queue (that mail message gets removed from the queue)
+        mailQueue.take();
     }
 }
