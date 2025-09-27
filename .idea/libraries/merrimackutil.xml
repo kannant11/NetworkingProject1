@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="merrimackutil">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/lib/merrimackutil.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
