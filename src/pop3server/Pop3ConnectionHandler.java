@@ -1,6 +1,7 @@
 package pop3server;
 
 import common.*;
+import maildirsupport.MailboxInMemoryRepresentation;
 
 import java.io.*;
 import java.net.Socket;
@@ -32,7 +33,7 @@ public class Pop3ConnectionHandler implements Runnable {
 
             State st = State.AUTHORIZATION;
             Account acc = null;
-            MailBox mb = null;
+            MailboxInMemoryRepresentation mb = null;
 
             send(out, "+OK welcome to " + cfg.server_name + " tinypop3 server.");
 
@@ -47,7 +48,7 @@ public class Pop3ConnectionHandler implements Runnable {
                     if (st == State.TRANSACTION && mb != null) {
                         // enter UPDATE: delete marked, then bye
                         try {
-                            mb.deleteMarked();
+                            mb.DeleteEmail();
                         } catch (Exception ignore) {
                         }
                     }
@@ -75,7 +76,7 @@ public class Pop3ConnectionHandler implements Runnable {
                             }
                             // load mailbox
                             Path spoolRoot = Paths.get(acc.spool());
-                            mb = new MailBox(spoolRoot, acc.username());
+                            mb = new MailboxInMemoryRepresentation(spoolRoot, acc.username());
                             mb.loadNew();
                             send(out, "+OK authenticated user.");
                             st = State.TRANSACTION;

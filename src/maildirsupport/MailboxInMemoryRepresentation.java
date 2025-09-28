@@ -1,70 +1,54 @@
 package maildirsupport;
 
+import common.MailBoxException;
+
+import java.io.*;
+import java.nio.file.*;
 import java.util.Arrays;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
 import java.util.LinkedList;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.time.Instant;
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.FileWriter;
+import java.util.NavigableMap;
+import java.util.TreeMap;
 
 public class MailboxInMemoryRepresentation {
-    
+    private Path userRoot;     // .../<spool>/<username>
+    private Path dirTmp;
+    private Path dirNew;
+
+    private final NavigableMap<Integer, Path> indexToPath = new TreeMap<>();
+
     // Holds all marked emails for deletion
-    LinkedList<String> marked;
+    LinkedList<String> markedForDeletion;
 
-    public void MailToDirectory(MessageInMemoryRepresentation msge){
-
-        //Makes a list of those reciving the email and then creates a file for each recipient.
-        LinkedList<String> list = msge.getRecipients();
-
-        for(int i = 0; i < list.size(); i++){
-
-            //Name of file
-            String name = Instant.now().toString();
-
-            //Destinations for its initial creation and end point
-            String path = "mail/" + list.get(i) + "/tmp/" + name + ".txt";
-            String dest = "mail/" + list.get(i) + "/new/" + name + ".txt";
-
-            File file = new File(path);
-
-            //  try(FileWriter fw = new FileWriter(file.getPath(), true));
-            //  BufferedWriter bw = new BufferedWriter(fw) {
-
-            //Adds sender email to the first line and message on the second line
-            try (FileWriter fw = new FileWriter(file.getPath(), true);
-            BufferedWriter bw = new BufferedWriter(fw)) {
-
-                //Potential error could be from \n since multiple reasources offered different ways to move lines, will look at later if needed
-                bw.write(msge.getSender() + "\n" + msge.getMessage());
-
-            } catch (IOException e) {
-
-                System.out.println("Can't find file");
-
-            }
-
-            // Moves files from tmp to new
-             try {
-
-                Files.move(Paths.get(path), Paths.get(dest), StandardCopyOption.REPLACE_EXISTING);
-
-             } catch (IOException e) {
-
-                System.out.println("Error moving file");
-
-             }
-
-        }
-
+    public MailboxInMemoryRepresentation() {
+        this.userRoot = Path.of("mail");
+        this.dirNew = userRoot.resolve("new");
+        this.dirTmp = userRoot.resolve("tmp");
     }
+
+    public MailboxInMemoryRepresentation(Path spoolRoot, String username) {
+        this.userRoot = spoolRoot.resolve(username);
+        this.dirTmp = userRoot.resolve("tmp");
+        this.dirNew = userRoot.resolve("new");
+    }
+
+    /** Load current NEW directory into an index map (lazy: don’t read file contents). */
+    public void loadNew() throws MailBoxException {
+        indexToPath.clear();
+        int idx = 1;
+        try (DirectoryStream<Path> ds = Files.newDirectoryStream(dirNew)) {
+            for (Path p : ds) {
+                if (Files.isRegularFile(p)) {
+                    indexToPath.put(idx, p.getFileName());
+                    idx++;
+                }
+            }
+        } catch (IOException e) {
+            throw new MailBoxException("Failed to load new/", e);
+        }
+        markedForDeletion.clear();
+    }
+
+    public int messageCount() { return indexToPath.size(); }
 
     //Gets a list of all files in a directory and sorts the by alphabetical order for a consistent order
     public String[] LoadMessages(String user){
@@ -140,7 +124,7 @@ public class MailboxInMemoryRepresentation {
 
         String path = ("mail/" + user + "/new/" + name);
 
-        marked.add(path);
+        markedForDeletion.add(path);
 
     }
 
@@ -148,9 +132,9 @@ public class MailboxInMemoryRepresentation {
     //will test this tommorrow as it is late
     public void DeleteEmail(){
 
-        for (int i = 0; i < marked.size(); i++){
+        for (int i = 0; i < markedForDeletion.size(); i++){
 
-            File file = new File(marked.get(i));
+            File file = new File(markedForDeletion.get(i));
 
             if(file.delete()){
 
@@ -171,7 +155,7 @@ public class MailboxInMemoryRepresentation {
     //Unselects all marked emails
     public void Unselected(){
 
-        marked.clear();
+        markedForDeletion.clear();
 
     }
 

@@ -1,16 +1,16 @@
 package maildirsupport;
 import java.util.LinkedList;
 
-public class MessageInMemoryRepresentation{
+public class MailMessage {
 
     private String message;
     private String sender;
     private LinkedList<String> recipients;
 
-    MessageInMemoryRepresentation(String msge, String id, LinkedList<String> recipients){
+    public MailMessage(String msge, String sender, LinkedList<String> recipients){
 
         this.message = msge;
-        this.sender = id;
+        this.sender = sender;
         this.recipients = recipients;
 
     }
