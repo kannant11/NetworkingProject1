@@ -48,7 +48,7 @@ public class Pop3ConnectionHandler implements Runnable {
                     if (st == State.TRANSACTION && mb != null) {
                         // enter UPDATE: delete marked, then bye
                         try {
-                            mb.DeleteEmail();
+                            mb.deleteMarked();
                         } catch (Exception ignore) {
                         }
                     }
@@ -141,7 +141,7 @@ public class Pop3ConnectionHandler implements Runnable {
                                     break;
                                 }
                                 int idx = parseIndex(parts[1]);
-                                String msg = mb.readMessage(idx);
+                                String msg = mb.getMessage(idx);
                                 // Size hint can remain as-is; strict octet count isn’t required by most clients.
                                 send(out, "+OK " + msg.getBytes().length + " octets");
                                 writeRetr(out, msg);   // <-- now dot-stuffed & CRLF-normalized
@@ -169,7 +169,7 @@ public class Pop3ConnectionHandler implements Runnable {
                                 }
                                 int idx = parseIndex(parts[1]);
                                 int n = parseIndex(parts[2]); // clamp to >= 0
-                                String msg = mb.readMessage(idx);
+                                String msg = mb.getMessage(idx);
                                 send(out, "+OK top of message follows");
                                 writeTop(out, msg, n);   // <-- see helper below (does dot-stuffing)
                                 send(out, ".");          // end of multi-line
