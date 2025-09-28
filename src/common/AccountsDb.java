@@ -18,7 +18,7 @@ public class AccountsDb {
             JSONObject o = arr.getObject(i);
             Account a = new Account(
                     o.getString("username"),
-                    o.getString("pass"),
+                    o.getString("password"),
                     o.getString("spool"));
             db.byUser.put(a.username(), a);
         }

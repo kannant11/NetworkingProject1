@@ -60,8 +60,10 @@ public class Pop3ConnectionHandler implements Runnable {
                     case AUTHORIZATION -> {
                         if ("USER".equals(cmd) && parts.length == 2) {
                             String u = parts[1];
-                            acc = accounts.get(u);
-                            if (acc != null) send(out, "+OK Hello " + u);
+                            var userParts = u.split("@");
+                            var userName = userParts[0];
+                            acc = accounts.get(userName);
+                            if (userName != null) send(out, "+OK Hello " + u);
                             else send(out, "-ERR no such user");
                         } else if ("PASS".equals(cmd) && parts.length == 2) {
                             if (acc == null) {
@@ -69,7 +71,7 @@ public class Pop3ConnectionHandler implements Runnable {
                                 break;
                             }
                             String pw = parts[1];
-                            if (!acc.pass().equals(pw)) {
+                            if (!acc.password().equals(pw)) {
                                 send(out, "-ERR invalid credentials");
                                 acc = null;
                                 break;
