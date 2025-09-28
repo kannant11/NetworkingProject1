@@ -30,7 +30,8 @@ public class MailQueue {
                                                                                
         mailQueue.drainTo(tempMailQueue); //take out all contents of the temporary mail queue
 
-        mailQueue.put(newMailMessage); //put the new mail message at the tail for now (while all other contents are removed)
+        mailQueue.put(newMailMessage); //put the new mail message in the original mail queue for now (while all other contents are 
+                                       //removed)
         
         //add the rest of the message back into the queue
         for(File mailMessage : tempMailQueue) {
