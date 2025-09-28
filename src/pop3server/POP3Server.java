@@ -12,7 +12,7 @@ import java.util.logging.*;
 
 public class Pop3Server {
     public static void main(String[] args) throws Exception {
-        Path cfgPath = Paths.get("pop3d.json");
+        Path cfgPath = Paths.get("pop3config.json");
         if (args.length == 2 && ("-c".equals(args[0]) || "--config".equals(args[0]))) {
             cfgPath = Paths.get(args[1]);
         }
