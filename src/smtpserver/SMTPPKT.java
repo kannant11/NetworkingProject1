@@ -5,6 +5,8 @@ import maildirsupport.MailMessage;
 import java.io.*;
 import java.net.Socket;
 import java.util.logging.Logger;
+import java.util.LinkedList;
+import java.io.File;
 
 public class SMTPPKT implements Runnable {
     private enum State {NEED_HELO, READY_MAIL, RCPT_DATA, READING_DATA, CLOSE}
@@ -67,6 +69,88 @@ public class SMTPPKT implements Runnable {
                         } else {
                             send(out, "503 Bad sequence of commands");
                         }
+                    }
+
+                    case READY_MAIL -> {
+
+                        if(U.startsWith("AMIL")){
+                            send(out, "MAIL FROM: " + queue.getLinkedBlockingQueue().peek().getSender() + "@wonderland");
+                            st = State.RCPT_DATA;
+                        }
+
+                        else if(U.startsWith("MAIL")){
+                            send(out, "250 OK");
+                            st = State.RCPT_DATA;
+                        }
+                        // MailMessage mail = queue.take();
+                        // LinkedList<String> recp = mail.getRecipients();
+                        else {
+                            send(out, "503 Bad sequence of commands");
+                        }
+
+                    }
+
+                    case RCPT_DATA -> {
+
+                        if(U.startsWith("CRPT")){
+
+                            MailMessage mail = queue.take();
+                            LinkedList<String> recp = mail.getRecipients();
+
+                            for(int i = 0; i < recp.size(); i++){
+
+                                send(out, "RCPT TO: " + recp.get(i) + "@wonderland");
+
+                            }
+
+                            st = State.READING_DATA;
+
+                        }
+
+                        else if(U.startsWith("RCPT")){
+
+                            send(out, "250 OK");
+
+                            st = State.READING_DATA;
+
+                        }
+
+                        else {
+                            send(out, "503 Bad sequence of commands");
+                        }
+
+                    }
+
+                    case READING_DATA -> {
+
+                        if (U.startsWith("ADTA")){
+
+                            send(out, "DATA");
+
+                            st = State.CLOSE;
+
+                        }
+
+                        else if (U.startsWith("DATA")){
+
+                            send(out, "354 End data with <CR><LR>. <CR><LR>");
+                            send(out, "250 Ok delivered message");
+
+                            st = State.CLOSE;
+
+                        }
+
+                        else {
+                            send(out, "503 Bad sequence of commands");
+                        }
+
+                    }
+
+                case CLOSE -> {
+                    
+                    break;
+                }
+
                     }
 
                 }
