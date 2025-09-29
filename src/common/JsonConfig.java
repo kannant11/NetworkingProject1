@@ -31,7 +31,7 @@ public class JsonConfig {
     public static JsonConfig fromJson(JSONObject obj) {
         JsonConfig c = new JsonConfig();
         c.spool = obj.getString("spool");
-        c.server_name = obj.getString("server-name");
+        c.server_name = obj.getString("serverName");
         c.port = obj.getInt("port");
         c.log = obj.getString("log");
         return c;

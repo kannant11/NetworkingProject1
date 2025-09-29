@@ -1,16 +1,16 @@
 package pop3server;
 
 import common.*;
+import maildirsupport.MailboxInMemoryRepresentation;
 import merrimackutil.json.JsonIO;
 import merrimackutil.json.types.JSONObject;
 
-import java.io.*;
 import java.net.*;
 import java.nio.file.*;
 import java.util.concurrent.*;
 import java.util.logging.*;
 
-public class Pop3Server {
+public class Server {
     public static void main(String[] args) throws Exception {
         Path cfgPath = Paths.get("pop3config.json");
         if (args.length == 2 && ("-c".equals(args[0]) || "--config".equals(args[0]))) {
@@ -28,6 +28,9 @@ public class Pop3Server {
 
         AccountsDb accounts = AccountsDb.load(Paths.get(cfg.accounts));
         ExecutorService pool = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+
+        // Dummy call to make sure that Mailbox is initialized
+        MailboxInMemoryRepresentation.getInstance(Path.of(cfg.spool));
 
         try (ServerSocket ss = new ServerSocket(cfg.getPort())) {
             while (true) {

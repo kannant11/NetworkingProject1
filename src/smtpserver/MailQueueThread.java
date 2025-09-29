@@ -1,15 +1,11 @@
 package smtpserver;
 
-import common.SmtpAddrUtil;
 import maildirsupport.MailMessage;
 import maildirsupport.MailboxInMemoryRepresentation;
 
-import java.io.File;
 import java.nio.file.Path;
 import java.util.LinkedList;
-import java.util.List;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.stream.Collectors;
+import common.SmtpAddrUtil;
 
 public class MailQueueThread extends Thread {
 
@@ -37,7 +33,7 @@ public class MailQueueThread extends Thread {
                 for (String rcpt : msg.getRecipients()) {
                     String[] parts = SmtpAddrUtil.extractAddrSpec(rcpt).split("@", 2);
                     if (parts.length != 2 || !this.serverName.equalsIgnoreCase(parts[1])) continue;
-                    MailboxInMemoryRepresentation mb = new MailboxInMemoryRepresentation(spoolRoot, parts[0]);
+                    MailboxInMemoryRepresentation mb = MailboxInMemoryRepresentation.getInstance(spoolRoot);
                     // Temporarily wrap the normalized text into a MailMessage for existing API
                     String msgToStore = normalized.endsWith("\r\n") ? normalized.substring(0, normalized.length() - 2) : normalized;
                     // Preserve \r\n protocol lines exactly:
@@ -45,7 +41,7 @@ public class MailQueueThread extends Thread {
                     LinkedList<String> recipients = (LinkedList<String>) msg.getRecipients().stream().toList();
                     MailMessage toStore = new MailMessage(msgToStore, msg.getSender(), recipients);
                     toStore.setSender(msg.getSender());
-                    mb.add(toStore);
+                    mb.add(toStore, parts[0]);
                 }
             } catch (InterruptedException ignored) {
                 return;

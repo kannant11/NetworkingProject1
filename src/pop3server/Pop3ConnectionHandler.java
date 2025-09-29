@@ -45,13 +45,13 @@ public class Pop3ConnectionHandler implements Runnable {
                 String cmd = parts[0].toUpperCase();
 
                 if ("QUIT".equals(cmd)) {
-                    if (st == State.TRANSACTION && mb != null) {
-                        // enter UPDATE: delete marked, then bye
-                        try {
-                            mb.deleteMarked();
-                        } catch (Exception ignore) {
-                        }
-                    }
+//                    if (st == State.TRANSACTION && mb != null) {
+//                        // enter UPDATE: delete marked, then bye
+//                        try {
+//                            mb.deleteMarked();
+//                        } catch (Exception ignore) {
+//                        }
+//                    }
                     send(out, "+OK bye");
                     break;
                 }
@@ -78,15 +78,14 @@ public class Pop3ConnectionHandler implements Runnable {
                             }
                             // load mailbox
                             Path spoolRoot = Paths.get(acc.spool());
-                            mb = new MailboxInMemoryRepresentation(spoolRoot, acc.username());
-                            mb.loadNew();
+                            mb = MailboxInMemoryRepresentation.getInstance(spoolRoot);
                             send(out, "+OK authenticated user.");
                             st = State.TRANSACTION;
-//                        } else if ("CAPA".equals(cmd)) {
-//                            send(out, "+OK Capability list follows");
-//                            send(out, "TOP");
+                        } else if ("CAPA".equals(cmd)) {
+                            send(out, "+OK Capability list follows");
+                            send(out, "TOP");
 //                            send(out, "UIDL");
-//                            send(out, ".");
+                            send(out, ".");
                         } else {
                             send(out, "-ERR invalid in AUTHORIZATION");
                         }
@@ -94,14 +93,14 @@ public class Pop3ConnectionHandler implements Runnable {
                     case TRANSACTION -> {
                         switch (cmd) {
                             case "STAT" -> {
-                                int count = mb.messageCount();
-                                long octets = mb.totalSizeBytes();
+                                int count = mb.messageCount(acc.username());
+                                long octets = mb.totalSizeBytes(acc.username());
                                 send(out, "+OK " + count + " " + octets);
                             }
                             case "UIDL" -> {
                                 if (parts.length == 1) {
                                     send(out, "+OK");
-                                    for (var e : mb.list()) {
+                                    for (var e : mb.list(acc.username())) {
                                         int i = e.getKey();
                                         String uid = String.valueOf(i);
                                         send(out, i + " " + uid);
@@ -110,7 +109,7 @@ public class Pop3ConnectionHandler implements Runnable {
                                 } else {
                                     int idx = parseIndex(parts[1]); // message number
                                     // find the entry with key == idx
-                                    var list = mb.list();
+                                    var list = mb.list(acc.username());
                                     Map.Entry<Integer, Long> entry = null;
                                     for (var e : list) {
                                         if (e.getKey() == idx) {
@@ -128,11 +127,11 @@ public class Pop3ConnectionHandler implements Runnable {
                             case "LIST" -> {
                                 if (parts.length == 2) {
                                     int idx = parseIndex(parts[1]);
-                                    long size = mb.sizeBytes(idx);
+                                    long size = mb.sizeBytes(acc.username(), idx);
                                     send(out, "+OK " + idx + " " + size);
                                 } else {
-                                    List<Map.Entry<Integer, Long>> list = mb.list();
-                                    send(out, "+OK " + list.size() + " messages (" + mb.totalSizeBytes() + " octets)");
+                                    List<Map.Entry<Integer, Long>> list = mb.list(acc.username());
+                                    send(out, "+OK " + list.size() + " messages (" + mb.totalSizeBytes(acc.username()) + " octets)");
                                     for (var e : list) send(out, e.getKey() + " " + e.getValue());
                                     send(out, ".");
                                 }
@@ -143,7 +142,7 @@ public class Pop3ConnectionHandler implements Runnable {
                                     break;
                                 }
                                 int idx = parseIndex(parts[1]);
-                                String msg = mb.getMessage(idx);
+                                String msg = mb.getMessage(acc.username(), idx);
                                 // Size hint can remain as-is; strict octet count isn’t required by most clients.
                                 send(out, "+OK " + msg.getBytes().length + " octets");
                                 writeRetr(out, msg);   // <-- now dot-stuffed & CRLF-normalized
@@ -155,13 +154,12 @@ public class Pop3ConnectionHandler implements Runnable {
                                     break;
                                 }
                                 int idx = parseIndex(parts[1]);
-                                mb.markDelete(idx);
+                                mb.markDelete(acc.username(), idx);
                                 send(out, "+OK message " + idx + " deleted.");
                             }
                             case "NOOP" -> send(out, "+OK");
                             case "RSET" -> {
-                                mb.unmarkAll();
-                                mb.loadNew(); // reload mapping
+                                mb.unmarkAll(acc.username());
                                 send(out, "+OK");
                             }
                             case "TOP" -> {
@@ -171,7 +169,7 @@ public class Pop3ConnectionHandler implements Runnable {
                                 }
                                 int idx = parseIndex(parts[1]);
                                 int n = parseIndex(parts[2]); // clamp to >= 0
-                                String msg = mb.getMessage(idx);
+                                String msg = mb.getMessage(acc.username(), idx);
                                 send(out, "+OK top of message follows");
                                 writeTop(out, msg, n);   // <-- see helper below (does dot-stuffing)
                                 send(out, ".");          // end of multi-line
