@@ -2,68 +2,86 @@ package smtpserver;
 
 import maildirsupport.MailMessage;
 
-public class SMTPPKT {
-    
-    private enum CommandType {HELO, MAIL, RCPT, DATA, RSET, NOOP, QUIT}
-    String val;
-    CommandType commandType;
+import java.io.*;
+import java.net.Socket;
+import java.util.logging.Logger;
 
-    SMTPPKT(MailMessage msg){
+public class SMTPPKT implements Runnable {
+    private enum State {NEED_HELO, READY_MAIL, RCPT_DATA, READING_DATA, CLOSE}
 
-        val = msg.getMessage();
-        commandType = CommandType.valueOf(msg.getMessage().substring(0, 4).toUpperCase());
+    private final Socket sock;
+    private final String serverName;
+    private final MailQueue queue;
+    private final Logger log;
 
+    public SMTPPKT(Socket sock, String serverName, MailQueue queue, Logger log) {
+        this.sock = sock;
+        this.serverName = serverName;
+        this.queue = queue;
+        this.log = log;
     }
 
-    public CommandType getCommandType(){
+    public void run() {
+        try (BufferedReader in = new BufferedReader(new InputStreamReader(sock.getInputStream()));
+             BufferedWriter out = new BufferedWriter(new OutputStreamWriter(sock.getOutputStream()))) {
 
-        return commandType;
+            State st = State.NEED_HELO;
+            MailMessage cur = null;
 
-    }
+            send(out, "220 " + serverName + " SMTP tinysmtp");
+            for (; ; ) {
+                String line = in.readLine(); // lines already stripped of \r\n by Reader
+                if (line == null) break;
+                log.info("c: " + line);
 
-    public String getVal(){
+                String u = line.trim();
+                String U = u.toUpperCase();
+                if (U.startsWith("QUIT")) {
+                    send(out, "221 Bye");
+                    break;
+                } else if (U.startsWith("NOOP")) {
+                    send(out, "250 Ok");
+                    continue;
+                } else if (U.startsWith("RSET")) {
+                    if (st == State.READY_MAIL || st == State.RCPT_DATA) {
+                        cur = null;
+                        st = State.READY_MAIL;
+                        send(out, "250 Ok");
+                    } else {
+                        send(out, "503 Bad sequence of commands");
+                    }
+                    continue;
+                }
 
-        return val;
+                switch(st) {
+                    case NEED_HELO -> {
+                        if (U.startsWith("EHLO")) {
+                            String clientIp = sock.getInetAddress().getHostAddress();
+                            // EHLO requires a 250-multiline; last line must start with "250 "
+                            send(out, "250-" + serverName + " greets " + clientIp);
+                            send(out, "250 HELP");
+                            st = State.READY_MAIL;
+                        } else if (U.startsWith("HELO")) {
+                            send(out, "250 <" + sock.getInetAddress().getHostAddress() + ">, I am glad to meet you.");
+                            st = State.READY_MAIL;
+                        } else {
+                            send(out, "503 Bad sequence of commands");
+                        }
+                    }
 
-    }
-
-    public void Protocol(CommandType type){
-
-        switch(type){
-
-            case HELO:
-                // handle HELO command
-
-                
-
-                break;
-
-            case MAIL:
-                // handle MAIL command
-                break;
-
-            case RCPT:
-                // handle RCPT command
-                break;
-
-            case DATA:
-                // handle DATA command
-                break;
-
-            case RSET:
-                // handle RSET command
-                break;
-
-            case NOOP:
-                // handle NOOP command
-                break;
-
-            case QUIT:
-                // handle QUIT command
-                break;
-
+                }
+            }
+        } catch (IOException e) {
+            // log & close
+            e.printStackTrace();
         }
+    }
 
+    private void send(BufferedWriter out, String s) throws IOException {
+        String line = s + "\r\n";
+        out.write(line);
+        out.flush();
+        log.info("s: " + s);
     }
 
 }

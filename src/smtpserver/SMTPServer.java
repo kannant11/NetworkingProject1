@@ -54,7 +54,7 @@ public class SMTPServer {
         try (ServerSocket ss = new ServerSocket(cfg.port)) {
             while (true) {
                 Socket sock = ss.accept();
-//                pool.submit(new SmtpConnectionHandler(sock, cfg.server_name, queue, log));
+                pool.submit(new SMTPPKT(sock, cfg.server_name, queue, log));
             }
         }
 
