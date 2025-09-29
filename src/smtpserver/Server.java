@@ -6,24 +6,18 @@ import merrimackutil.json.JsonIO;
 
 import java.net.Socket;
 import java.net.ServerSocket;
-import java.io.IOException;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import java.util.LinkedList;
-import java.io.File;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.FileWriter;
 import java.util.logging.FileHandler;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 
-public class SMTPServer {
+public class Server {
     
     LinkedList<Path> Mailboxes = new LinkedList<>(
         java.util.Arrays.asList(Paths.get("maildirsupport/mail/adamroche"), Paths.get("maildirsupport/mail/joeywilliams"), Paths.get("maildirsupport/mail/nickjohnson"))
