@@ -1,29 +1,24 @@
 package smtpserver;
 
+import common.*;
 import maildirsupport.MailMessage;
 
 import java.io.*;
 import java.net.Socket;
 import java.util.logging.Logger;
-import java.util.LinkedList;
-import java.io.File;
 
-public class SMTPPKT implements Runnable {
-    private enum State {NEED_HELO, READY_MAIL, RCPT_DATA, READING_DATA, CLOSE}
-
+public class SmtpConnectionHandler implements Runnable {
+    private enum State { NEED_HELO, READY_MAIL, RCPT_DATA, READING_DATA, CLOSE }
     private final Socket sock;
     private final String serverName;
     private final MailQueue queue;
     private final Logger log;
 
-    public SMTPPKT(Socket sock, String serverName, MailQueue queue, Logger log) {
-        this.sock = sock;
-        this.serverName = serverName;
-        this.queue = queue;
-        this.log = log;
+    public SmtpConnectionHandler(Socket sock, String serverName, MailQueue queue, Logger log) {
+        this.sock = sock; this.serverName = serverName; this.queue = queue; this.log = log;
     }
 
-    public void run() {
+    @Override public void run() {
         try (BufferedReader in = new BufferedReader(new InputStreamReader(sock.getInputStream()));
              BufferedWriter out = new BufferedWriter(new OutputStreamWriter(sock.getOutputStream()))) {
 
@@ -31,13 +26,15 @@ public class SMTPPKT implements Runnable {
             MailMessage cur = null;
 
             send(out, "220 " + serverName + " SMTP tinysmtp");
-            for (; ; ) {
+
+            for (;;) {
                 String line = in.readLine(); // lines already stripped of \r\n by Reader
                 if (line == null) break;
                 log.info("c: " + line);
 
                 String u = line.trim();
                 String U = u.toUpperCase();
+
                 if (U.startsWith("QUIT")) {
                     send(out, "221 Bye");
                     break;
@@ -55,7 +52,7 @@ public class SMTPPKT implements Runnable {
                     continue;
                 }
 
-                switch(st) {
+                switch (st) {
                     case NEED_HELO -> {
                         if (U.startsWith("EHLO")) {
                             String clientIp = sock.getInetAddress().getHostAddress();
@@ -70,90 +67,59 @@ public class SMTPPKT implements Runnable {
                             send(out, "503 Bad sequence of commands");
                         }
                     }
-
                     case READY_MAIL -> {
-
-                        if(U.startsWith("AMIL")){
-                            send(out, "MAIL FROM: " + queue.getLinkedBlockingQueue().peek().getSender() + "@wonderland");
-                            st = State.RCPT_DATA;
-                        }
-
-                        else if(U.startsWith("MAIL")){
-                            send(out, "250 OK");
-                            st = State.RCPT_DATA;
-                        }
-                        // MailMessage mail = queue.take();
-                        // LinkedList<String> recp = mail.getRecipients();
-                        else {
-                            send(out, "503 Bad sequence of commands");
-                        }
-
-                    }
-
-                    case RCPT_DATA -> {
-
-                        if(U.startsWith("CRPT")){
-
-                            MailMessage mail = queue.take();
-                            LinkedList<String> recp = mail.getRecipients();
-
-                            for(int i = 0; i < recp.size(); i++){
-
-                                send(out, "RCPT TO: " + recp.get(i) + "@wonderland");
-
+                        if (U.startsWith("MAIL FROM:")) {
+                            String addr = u.substring("MAIL FROM:".length()).trim();
+                            addr = SmtpAddrUtil.extractAddrSpec(addr);
+                            if (!addr.contains("@") || !addr.endsWith(serverName)) {
+                                // Project spec: reject sender that doesn't match server name
+                                send(out, "504 5.5.2 " + addr + ": Sender address rejected");
+                            } else {
+                                cur = new MailMessage();
+                                cur.setSender(addr);
+                                send(out, "250 Ok");
+                                st = State.RCPT_DATA;
                             }
-
-                            st = State.READING_DATA;
-
-                        }
-
-                        else if(U.startsWith("RCPT")){
-
-                            send(out, "250 OK");
-
-                            st = State.READING_DATA;
-
-                        }
-
-                        else {
+                        } else {
                             send(out, "503 Bad sequence of commands");
                         }
-
                     }
-
+                    case RCPT_DATA -> {
+                        if (U.startsWith("RCPT TO:")) {
+                            String rcpt = u.substring("RCPT TO:".length()).trim();
+                            if (!rcpt.contains("@")) {
+                                send(out, "501 Syntax: improper syntax");
+                            } else {
+                                cur.addRecipient(rcpt);
+                                send(out, "250 Ok");
+                            }
+                        } else if (U.equals("DATA")) {
+                            if (cur == null || cur.getRecipients().isEmpty()) {
+                                send(out, "503 Bad sequence of commands");
+                            } else {
+                                send(out, "354 End data with <CR><LF>.<CR><LF>");
+                                st = State.READING_DATA;
+                            }
+                        } else {
+                            send(out, "503 Bad sequence of commands");
+                        }
+                    }
                     case READING_DATA -> {
-
-                        if (U.startsWith("ADTA")){
-
-                            send(out, "DATA");
-
-                            st = State.CLOSE;
-
+                        // Read until a line that is exactly "."
+                        while (true) {
+                            String bodyLine = in.readLine();
+                            if (bodyLine == null) { st = State.CLOSE; break; }
+                            if (bodyLine.equals(".")) break;
+                            // Dot-stuffing not required by your brief; accept as-is
+                            cur.appendBodyLine(bodyLine);
                         }
-
-                        else if (U.startsWith("DATA")){
-
-                            send(out, "354 End data with <CR><LR>. <CR><LR>");
-                            send(out, "250 Ok delivered message");
-
-                            st = State.CLOSE;
-
-                        }
-
-                        else {
-                            send(out, "503 Bad sequence of commands");
-                        }
-
+                        // Enqueue regardless; worker decides local delivery
+                        queue.add(cur);
+                        send(out, "250 Ok delivered message.");
+                        cur = null;
+                        st = State.READY_MAIL;
                     }
-
-                case CLOSE -> {
-                    
-                    break;
-                    
-                }
-
-                    }
-
+                    default -> send(out, "502 5.5.2 Error: command not recognized");
                 }
             }
         } catch (IOException e) {
@@ -168,7 +134,4 @@ public class SMTPPKT implements Runnable {
         out.flush();
         log.info("s: " + s);
     }
-
 }
-
-

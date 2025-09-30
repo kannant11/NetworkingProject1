@@ -38,7 +38,7 @@ public class MailQueueThread extends Thread {
                     String msgToStore = normalized.endsWith("\r\n") ? normalized.substring(0, normalized.length() - 2) : normalized;
                     // Preserve \r\n protocol lines exactly:
                     msgToStore += msgToStore + "\r\n";
-                    LinkedList<String> recipients = (LinkedList<String>) msg.getRecipients().stream().toList();
+                    LinkedList<String> recipients = new LinkedList<>(msg.getRecipients());
                     MailMessage toStore = new MailMessage(msgToStore, msg.getSender(), recipients);
                     toStore.setSender(msg.getSender());
                     mb.add(toStore, parts[0]);

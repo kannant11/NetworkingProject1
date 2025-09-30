@@ -4,16 +4,24 @@ import common.MailBoxException;
 
 import java.io.*;
 import java.nio.file.*;
+import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
 
 public class MailboxInMemoryRepresentation {
     private Path spoolRoot;     // .../<spool>/<username>
 
+    // Counter for ensuring sequential filenames
+    private final AtomicLong messageCounter = new AtomicLong(System.currentTimeMillis());
+
     // Holds all marked emails for deletion per user
     private final Map<String, Set<Integer>> markedForDeletion = new HashMap<>();
+
+    // Track last modification time of each user's "new" directory
+    private final Map<String, FileTime> lastModifiedTimes = new HashMap<>();
 
     // Per-user in-memory index: POP3-style 1-based index -> file path in user's "new"
     private final Map<String, NavigableMap<Integer, Path>> userIndexes = new HashMap<>();
@@ -36,9 +44,10 @@ public class MailboxInMemoryRepresentation {
         var dirNew = userRoot.resolve("new");
         var dirTmp = userRoot.resolve("tmp");
         try {
-            String fname = Instant.now().toString(); // unique enough for this project
+            // Combines timestamp with guaranteed unique counter
+            String fname = messageCounter.getAndIncrement() + ".msg";
             Path tmpFile = dirTmp.resolve(fname);
-            Files.writeString(tmpFile, msg.getMessage()); // ASCII/UTF-8 OK for “plain text” here
+            Files.writeString(tmpFile, msg.getMessage()); // ASCII/UTF-8 OK for "plain text" here
 
             Path newFile = dirNew.resolve(fname);
             Files.move(tmpFile, newFile, ATOMIC_MOVE);
@@ -150,14 +159,25 @@ public class MailboxInMemoryRepresentation {
 
     // Build or get a cached 1-based index -> Path (relative to user's "new")
     private synchronized NavigableMap<Integer, Path> buildOrGetIndex(String userName) throws MailBoxException {
-        NavigableMap<Integer, Path> cached = userIndexes.get(userName);
-        if (cached != null) return cached;
-
         var userRoot = spoolRoot.resolve(userName);
         var dirNew = userRoot.resolve("new");
-        NavigableMap<Integer, Path> index = new TreeMap<>();
+        
         try {
-            Files.createDirectories(dirNew);
+            // Check if directory has been modified since last index build
+            FileTime currentModTime = Files.getLastModifiedTime(dirNew);
+            FileTime cachedModTime = lastModifiedTimes.get(userName);
+            
+            // If we have a cached index and the directory hasn't been modified, return cached
+            NavigableMap<Integer, Path> cached = userIndexes.get(userName);
+            if (cached != null && cachedModTime != null && !currentModTime.equals(cachedModTime)) {
+                // Directory was modified, invalidate cache
+                cached = null;
+            }
+            
+            if (cached != null) return cached;
+            
+            // Rebuild index
+            NavigableMap<Integer, Path> index = new TreeMap<>();
             int idx = 1;
             try (DirectoryStream<Path> ds = Files.newDirectoryStream(dirNew)) {
                 for (Path p : ds) {
@@ -166,12 +186,14 @@ public class MailboxInMemoryRepresentation {
                     }
                 }
             }
+            
+            userIndexes.put(userName, index);
+            lastModifiedTimes.put(userName, currentModTime);
+            // Ensure marked set exists
+            markedForDeletion.computeIfAbsent(userName, k -> new HashSet<>());
+            return index;
         } catch (IOException e) {
             throw new MailBoxException("Failed to load new/", e);
         }
-        userIndexes.put(userName, index);
-        // Ensure marked set exists
-        markedForDeletion.computeIfAbsent(userName, k -> new HashSet<>());
-        return index;
     }
 }

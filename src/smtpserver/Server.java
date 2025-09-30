@@ -25,7 +25,7 @@ public class Server {
 
     public static void main(String[] args) throws Exception {
 
-        Path cfgPath = Paths.get("smtpd.json");
+        Path cfgPath = Paths.get("smtpconfig.json");
         if (args.length == 2 && ("-c".equals(args[0]) || "--config".equals(args[0]))) {
             cfgPath = Paths.get(args[1]);
         }
@@ -48,7 +48,7 @@ public class Server {
         try (ServerSocket ss = new ServerSocket(cfg.port)) {
             while (true) {
                 Socket sock = ss.accept();
-                pool.submit(new SMTPPKT(sock, cfg.server_name, queue, log));
+                pool.submit(new SmtpConnectionHandler(sock, cfg.server_name, queue, log));
             }
         }
 

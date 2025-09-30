@@ -1,6 +1,6 @@
 {
     "spool":"mail",
-    "server-name":"wonderland",
+    "serverName":"wonderland",
     "port":5000,
     "log": "smtpd.log"
 }
