@@ -12,14 +12,14 @@ import common.SmtpAddrUtil;
 public class MailQueueThread extends Thread {
 
     private LinkedBlockingQueue<MailMessage> mailQueueCopy; //copy of mail queue
-    private Path spoolRoot;
-    private String serverName;
+    private Path spoolRoot; //spool root (main directory holding subdirectory for the files in queue)
+    private String serverName; //name of server
 
     //mail queue thread constructor to take copy of mail queue
     public MailQueueThread(MailQueue q, Path spoolRoot, String serverName) {
-        this.mailQueueCopy = q.mailQueue;
-        this.spoolRoot = spoolRoot;
-        this.serverName = serverName;
+        this.mailQueueCopy = q.mailQueue; //initializing mail queue copy
+        this.spoolRoot = spoolRoot; //initializing spool root
+        this.serverName = serverName; //initializing server name
     }
 
     public void run() {
