@@ -5,17 +5,19 @@ import maildirsupport.MailboxInMemoryRepresentation;
 
 import java.nio.file.Path;
 import java.util.LinkedList;
+import java.util.concurrent.LinkedBlockingQueue;
+
 import common.SmtpAddrUtil;
 
 public class MailQueueThread extends Thread {
 
-    MailQueue mailQueueCopy; //copy of mail queue
+    private LinkedBlockingQueue<MailMessage> mailQueueCopy; //copy of mail queue
     private Path spoolRoot;
     private String serverName;
 
     //mail queue thread constructor to take copy of mail queue
-    public MailQueueThread(MailQueue queue, Path spoolRoot, String serverName) {
-        this.mailQueueCopy = queue;
+    public MailQueueThread(MailQueue q, Path spoolRoot, String serverName) {
+        this.mailQueueCopy = q.mailQueue;
         this.spoolRoot = spoolRoot;
         this.serverName = serverName;
     }
@@ -23,12 +25,11 @@ public class MailQueueThread extends Thread {
     public void run() {
         while (true) {
             try {
-                MailMessage msg = mailQueueCopy.take();
-                String serverName;
+                MailMessage msg = mailQueueCopy.take(); //message is taken from front of mail queue copy
                 String normalized = ensureRfc5322Headers(
-                        msg.getMessage(),
-                        msg.getSender(),
-                        msg.getRecipients(),
+                        msg.getMessage(), //message in email
+                        msg.getSender(), //sender of email
+                        msg.getRecipients(), //recipients of email (who sender is sending email to)
                         this.serverName);
                 for (String rcpt : msg.getRecipients()) {
                     String[] parts = SmtpAddrUtil.extractAddrSpec(rcpt).split("@", 2);
