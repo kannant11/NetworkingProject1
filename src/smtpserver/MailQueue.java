@@ -6,7 +6,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 public class MailQueue {
 
-    private LinkedBlockingQueue<MailMessage> mailQueue; //mail queue
+    public LinkedBlockingQueue<MailMessage> mailQueue; //mail queue
 
     //mail queue constructed as linked blocking queue
     public MailQueue() {
@@ -28,10 +28,5 @@ public class MailQueue {
                           //temporary queue)
 
         mailQueue.addAll(tempQueue); //messages in temporary queue moved back into the original queue
-    }
-
-    //take the mail message from the front of the queue
-    public MailMessage take() throws InterruptedException {
-        return mailQueue.take();
     }
 }
