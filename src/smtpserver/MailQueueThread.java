@@ -24,7 +24,6 @@ public class MailQueueThread extends Thread {
         while (true) {
             try {
                 MailMessage msg = mailQueueCopy.take();
-                String serverName;
                 String normalized = ensureRfc5322Headers(
                         msg.getMessage(),
                         msg.getSender(),
